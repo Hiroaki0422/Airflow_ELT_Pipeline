@@ -1,6 +1,6 @@
 
 
-# Airflow_ELT_Pipeline
+# Redshift_ELT_Pipeline
  <br>Author: Hiroaki Oshima    
  Date: Jan 4, 2021<br><br>
 # About This Project 
@@ -20,25 +20,8 @@
  4. **plugins/myoperators/data_quality**: Ensure given columns of given tables were transformed successfully <br><br>
 
 # Data Pipeline Workflow
-Dag:
-```mermaid
-
-graph LR
-Begin_execution --> Stage_event
-Begin_execution --> Stage_songs
-Stage_event --> Load_songplay_fact_table
-Stage_songs --> Load_songplay_fact_table
-Load_songplay_fact_table --> Load_user_dimtable
-Load_songplay_fact_table --> Load_time_dimtable
-Load_songplay_fact_table --> Load_song_dimtable
-Load_songplay_fact_table --> Load_artist_dimtable
-Load_user_dimtable --> Stop_execution
-Load_time_dimtable --> Stop_execution
-Load_song_dimtable --> Stop_execution
-Load_artist_dimtable --> Stop_execution
-
-```
-
+Dag Image:
+![dag image](https://i.ibb.co/2s9Vbc3/Screen-Shot-2021-03-03-at-3-15-03-PM.png)
 **Before Running Airflow**: I created a data warehouse cluster on AWS Redshift and assign the host address into an airflow variable along with the security credentials <br> <br>
 **Create Tables** uses postgres operator to create tables on AWS Redshift and drop old tables if exists. The SQL queries and detail schemas is in plugin/helpers/sql_queries.py <br><br>
 **Stage_tables** load log and song JSON data onto Redshift server from S3 <br><br>
