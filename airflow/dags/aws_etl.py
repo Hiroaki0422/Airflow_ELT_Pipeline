@@ -6,6 +6,7 @@ from airflow.operators import (StageToRedshiftOperator, LoadFactOperator,
                                 LoadDimensionOperator, DataQualityOperator)
 from airflow.operators.postgres_operator import PostgresOperator
 from helpers import SqlQueries, CreateQueries
+import operator
 
 # AWS_KEY = os.environ.get('AWS_KEY')
 # AWS_SECRET = os.environ.get('AWS_SECRET')
@@ -99,45 +100,17 @@ load_time_dimension_table = LoadDimensionOperator(
     sql=SqlQueries.time_table_insert
 )
 
-songplay_quality_checks =DataQualityOperator(
-    task_id='Run_songplay_quality_checks',
+run_data_quality_check = DataQualityOperator(
+    task_id='Run_data_quality_checks',
     dag=dag,
     redshift_conn_id='redshift',
-    table='songplays',
-    columns=['playid', 'sessionid']
-)
+    dq_checks= [{'testsql':'SELECT COUNT(*) FROM songs', 'expected':200000, 'op':operator.le},
+               {'testsql':'SELECT COUNT(*) FROM artists', 'expected':100000, 'op':operator.le},
+               {'testsql':'SELECT COUNT(*) FROM songplays', 'expected':1000, 'op':operator.ge},
+               {'testsql':'SELECT COUNT(*) FROM time', 'expected':1000, 'op':operator.ge},
+               {'testsql':'SELECT COUNT(*) FROM users', 'expected':1000, 'op':operator.ge}]
+    )
 
-user_quality_checks =DataQualityOperator(
-    task_id='Run_user_quality_checks',
-    dag=dag,
-    redshift_conn_id='redshift',
-    table='users',
-    columns=['userid']
-)
-
-song_quality_checks =DataQualityOperator(
-    task_id='Run_song_quality_checks',
-    dag=dag,
-    redshift_conn_id='redshift',
-    table='songs',
-    columns=['songid']
-)
-
-artist_quality_checks =DataQualityOperator(
-    task_id='Run_artist_quality_checks',
-    dag=dag,
-    redshift_conn_id='redshift',
-    table='artists',
-    columns=['artistid']
-)
-
-time_quality_checks =DataQualityOperator(
-    task_id='Run_time_quality_checks',
-    dag=dag,
-    redshift_conn_id='redshift',
-    table='time',
-    columns=['start_time', 'year']
-)
 
 end_operator = DummyOperator(task_id='Stop_execution',  dag=dag)
 
@@ -150,14 +123,9 @@ stage_songs_to_redshift >> load_songplays_table
 
 load_songplays_table >> [load_user_dimension_table, load_song_dimension_table, load_artist_dimension_table, load_time_dimension_table]
 
-load_songplays_table >> songplay_quality_checks
-load_user_dimension_table >> user_quality_checks
-load_song_dimension_table >> song_quality_checks
-load_artist_dimension_table >> artist_quality_checks
-load_time_dimension_table >> time_quality_checks
 
 [songplay_quality_checks, user_quality_checks, song_quality_checks, artist_quality_checks, \
- time_quality_checks] >> end_operator
+ time_quality_checks] >> run_data_quality_check >> end_operator
 
 
 
