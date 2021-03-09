@@ -8,8 +8,6 @@ from airflow.operators.postgres_operator import PostgresOperator
 from helpers import SqlQueries, CreateQueries
 import operator
 
-# AWS_KEY = os.environ.get('AWS_KEY')
-# AWS_SECRET = os.environ.get('AWS_SECRET')
 
 default_args = {
     'owner': 'hiroo',
@@ -26,7 +24,7 @@ default_args = {
 dag = DAG('udac_example_dag',
           default_args=default_args,
           description='Load and transform data in Redshift with Airflow',
-          schedule_interval= '@daily'
+          schedule_interval= '@hourly'
         )
 
 start_operator = DummyOperator(task_id='Begin_execution',  dag=dag)
@@ -100,15 +98,15 @@ load_time_dimension_table = LoadDimensionOperator(
     sql=SqlQueries.time_table_insert
 )
 
-run_data_quality_check = DataQualityOperator(
-    task_id='Run_data_quality_checks',
+data_validation = DataQualityOperator(
+    task_id='Data_quality_check',
     dag=dag,
     redshift_conn_id='redshift',
     dq_checks= [{'testsql':'SELECT COUNT(*) FROM songs', 'expected':200000, 'op':operator.le},
                {'testsql':'SELECT COUNT(*) FROM artists', 'expected':100000, 'op':operator.le},
+               {'testsql':'SELECT COUNT(*) FROM users', 'expected':1000, 'op':operator.ge},
                {'testsql':'SELECT COUNT(*) FROM songplays', 'expected':1000, 'op':operator.ge},
-               {'testsql':'SELECT COUNT(*) FROM time', 'expected':1000, 'op':operator.ge},
-               {'testsql':'SELECT COUNT(*) FROM users', 'expected':1000, 'op':operator.ge}]
+               {'testsql':'SELECT COUNT(*) FROM time', 'expected':1000, 'op':operator.ge}]
     )
 
 
@@ -121,11 +119,10 @@ create_tables >> [stage_events_to_redshift, stage_songs_to_redshift]
 stage_events_to_redshift >> load_songplays_table
 stage_songs_to_redshift >> load_songplays_table
 
-load_songplays_table >> [load_user_dimension_table, load_song_dimension_table, load_artist_dimension_table, load_time_dimension_table]
+load_songplays_table >> [load_user_dimension_table, load_song_dimension_table, load_artist_dimension_table, load_time_dimension_table] >> data_validation
 
+data_validation >> end_operator
 
-[songplay_quality_checks, user_quality_checks, song_quality_checks, artist_quality_checks, \
- time_quality_checks] >> run_data_quality_check >> end_operator
 
 
 
